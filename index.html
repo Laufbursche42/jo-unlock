@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="wrap">
@@ -26,6 +26,8 @@
     </div>
   </header>
 
+  <p class="hint infobox" data-t="infoBannerHtml"></p>
+
   <div class="card">
     <h2 data-t="s1Title"></h2>
     <p class="hint" data-t="sub"></p>
@@ -41,6 +43,10 @@
       <select id="model-in"></select>
     </div>
     <p class="hint" data-t="modelHint"></p>
+    <div class="log-opt">
+      <span data-t="showallLabel"></span>
+      <input type="checkbox" id="showall">
+    </div>
     <div class="btns">
       <button class="primary span2" id="btn-conn" data-act="connect"></button>
     </div>
@@ -49,11 +55,10 @@
     <p class="hint" data-t="controlsHint"></p>
   </div>
 
-  <div class="card">
-    <h2 data-t="liveTitle"></h2>
+  <div class="card" id="live-card" hidden>
+    <div class="card-head"><h2 data-t="liveTitle"></h2><button type="button" class="help-btn" data-help="live" aria-label="Info">?</button></div>
     <div class="grid">
       <div class="tile" id="tile-speed" hidden><b id="t-speed">-</b><small data-t="tileSpeed"></small></div>
-      <div class="tile" id="tile-batt" hidden><b id="t-batt">-</b><small data-t="tileBatt"></small></div>
       <div class="tile" id="tile-trip" hidden><b id="t-trip">-</b><small data-t="tileTrip"></small></div>
       <div class="tile" id="tile-total" hidden><b id="t-total">-</b><small data-t="tileTotal"></small></div>
       <div class="tile" id="tile-max" hidden><b id="t-max">-</b><small data-t="tileMax"></small></div>
@@ -72,18 +77,33 @@
     <p class="hint" data-t="liveHint"></p>
   </div>
 
-  <div class="card" id="card-speed" hidden>
-    <div class="card-head"><h2 data-t="s3Title"></h2><button type="button" class="help-btn" data-help="speed" aria-label="Info">?</button></div>
+  <div class="card" id="batt-card" hidden>
+    <div class="card-head"><h2 data-t="battTitle"></h2><button type="button" class="help-btn" data-help="batt" aria-label="Info">?</button></div>
+    <div class="grid">
+      <div class="tile" id="tile-batt" hidden><b id="t-batt">-</b><small data-t="tileBatt"></small></div>
+    </div>
+    <p class="hint" data-t="battHint"></p>
+  </div>
+
+  <div class="card" id="more-card" hidden>
+    <div class="card-head"><h2 data-t="moreTitle"></h2><button type="button" class="help-btn" data-help="more" aria-label="Info">?</button></div>
+    <p class="hint" data-t="moreHint"></p>
+
+    <h3 class="set-group" data-t="setgrpSpeed"></h3>
     <div class="set-row three">
       <label data-t="lblSpeedCap"></label>
       <input id="speed-kmh" type="number" step="1" min="1" max="25" value="6">
       <button class="primary" id="btn-setspeed" data-t="btnSetSpeed" disabled></button>
     </div>
     <p class="hint" data-t="speedCapHint"></p>
-  </div>
+    <div class="set-row">
+      <label data-t="immobTitle"></label>
+      <button id="btn-immob-unlock" data-t="btnImmobUnlock" disabled></button>
+      <button id="btn-immob-lock" data-t="btnImmobLock" disabled></button>
+    </div>
+    <p class="hint" data-t="immobHint"></p>
 
-  <div class="card" id="card-mode" hidden>
-    <div class="card-head"><h2 data-t="modeTitle"></h2><button type="button" class="help-btn" data-help="mode" aria-label="Info">?</button></div>
+    <h3 class="set-group" data-t="setgrpGeneral"></h3>
     <div class="set-row">
       <label data-t="lblMode"></label>
       <select id="mode-in" disabled>
@@ -93,31 +113,27 @@
       </select>
       <button id="btn-mode" data-t="btnSet" disabled></button>
     </div>
-  </div>
-
-  <div class="card" id="card-more" hidden>
-    <div class="card-head"><h2 data-t="moreTitle"></h2><button type="button" class="help-btn" data-help="more" aria-label="Info">?</button></div>
-    <div class="set-row" id="row-light">
+    <div class="set-row">
       <label data-t="lblLight"></label>
       <select id="light-in"><option value="2" data-t="btnOn"></option><option value="1" data-t="btnOff"></option></select>
       <button id="btn-light" data-t="btnSend" disabled></button>
     </div>
-    <div class="set-row" id="row-cruise">
+    <div class="set-row">
       <label data-t="lblCruise"></label>
       <select id="cruise-in"><option value="1" data-t="btnOn"></option><option value="2" data-t="btnOff"></option></select>
       <button id="btn-cruise" data-t="btnSend" disabled></button>
     </div>
-    <div class="set-row" id="row-startmode">
+    <div class="set-row">
       <label data-t="lblStartMode"></label>
       <select id="startmode-in"><option value="1" data-t="startZero"></option><option value="2" data-t="startNonZero"></option></select>
       <button id="btn-startmode" data-t="btnSet" disabled></button>
     </div>
-    <div class="set-row" id="row-unit">
+    <div class="set-row">
       <label data-t="lblUnit"></label>
       <select id="unit-in"><option value="1" data-t="optKm"></option><option value="2" data-t="optMi"></option></select>
       <button id="btn-unit" data-t="btnSend" disabled></button>
     </div>
-    <div class="set-row" id="row-gear">
+    <div class="set-row">
       <label data-t="lblGear"></label>
       <select id="gear-in">
         <option value="1" data-t="gearP"></option>
@@ -127,12 +143,17 @@
       </select>
       <button id="btn-gear" data-t="btnSet" disabled></button>
     </div>
-    <div class="set-row" id="row-lamp">
+    <div class="set-row">
       <label data-t="lblLamp"></label>
       <select id="lamp-in"><option value="1" data-t="lamp1"></option><option value="2" data-t="lamp2"></option></select>
       <button id="btn-lamp" data-t="btnSet" disabled></button>
     </div>
-    <div class="set-row" id="row-voltage">
+    <div class="set-row">
+      <label data-t="lblRgb"></label>
+      <input id="rgb-in" type="color" value="#00aaff">
+      <button id="btn-rgb" data-t="btnSet" disabled></button>
+    </div>
+    <div class="set-row">
       <label data-t="lblVoltage"></label>
       <select id="voltage-in">
         <option value="1" data-t="volt24"></option>
@@ -142,7 +163,7 @@
       </select>
       <button id="btn-voltage" data-t="btnSet" disabled></button>
     </div>
-    <div class="set-row" id="row-wheel">
+    <div class="set-row">
       <label data-t="lblWheel"></label>
       <select id="wheel-in">
         <option value="1">5"</option>
@@ -159,25 +180,17 @@
       </select>
       <button id="btn-wheel" data-t="btnSet" disabled></button>
     </div>
-    <div class="set-row" id="row-selftest">
+    <div class="set-row">
       <label data-t="lblSelfTest"></label>
       <button id="btn-selftest" data-t="btnRun" disabled></button>
     </div>
-    <div class="set-row" id="row-info">
+    <div class="set-row">
       <label data-t="lblInfo"></label>
       <button id="btn-info" data-t="btnQuery" disabled></button>
     </div>
   </div>
 
-  <div class="card" id="card-immob" hidden>
-    <div class="card-head"><h2 data-t="immobTitle"></h2><button type="button" class="help-btn" data-help="immob" aria-label="Info">?</button></div>
-    <div class="btns">
-      <button id="btn-immob-unlock" data-t="btnImmobUnlock" disabled></button>
-      <button id="btn-immob-lock" data-t="btnImmobLock" disabled></button>
-    </div>
-  </div>
-
-  <div class="card" id="card-expert" hidden>
+  <div class="card" id="raw-card" hidden>
     <div class="card-head"><h2 data-t="expertTitle"></h2><button type="button" class="help-btn" data-help="expert" aria-label="Info">?</button></div>
     <div class="ctrl-block">
       <h3 data-t="eRegTitle"></h3>
@@ -241,7 +254,7 @@
       <a id="link-privacy" href="PRIVACY.de.md" data-doc="PRIVACY" data-t="footPrivacy"></a>
       <a id="link-trademarks" href="TRADEMARKS.de.md" data-doc="TRADEMARKS" data-t="footTrademarks"></a>
     </span>
-    <span class="ver" id="build-ver"></span>
+    <span class="foot-links"><span class="ver" id="build-ver"></span><a href="https://github.com/Laufbursche42/Laufbursche42/issues" target="_blank" rel="noopener" data-t="footIssue"></a></span>
     <a class="foot-copy" href="https://laufbursche42.github.io/Laufbursche42/" target="_blank" rel="noopener">Copyright (c) 2026 Laufbursche</a>
   </footer>
 </div>

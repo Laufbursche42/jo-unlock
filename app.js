@@ -39,7 +39,10 @@ const ALL_SERVICES = Array.from(new Set(CANDIDATE_SERVICES));
 const REG = {
   STATUS: 0x01, HEARTBEAT: 0x08, DRIVE_MODE: 0x10, RGB: 0x15, JOYSTICK: 0x16, LOCK: 0x17,
   UNIT: 0x18, LAMP: 0x19, START_MODE: 0x1a, VOLTAGE: 0x1b, WHEEL: 0x1c, CRUISE: 0x1d,
-  SELFTEST: 0x1e, GEAR: 0x1f, INFO: 0x20, HEADLIGHT: 0x23,
+  SELFTEST: 0x1e, GEAR: 0x1f, HEADLIGHT: 0x23,
+  // RGB 0x15 = lamp colour (CarLampSettingsActivity.java:218, FF551503 RR GG BB); LAMP 0x19 = lamp mode
+  // (CarLampSettingsActivity.java:104-113, 01 single colour / 02 RGB). JOYSTICK 0x16 is the proven
+  // remote-control register (BluetoothControlActivity.java:169,339) - not exposed, it drives the scooter.
   // 8-byte long-frame queries / set (no checksum, last byte 0x00):
   SPEED_CAP: 0x38, Q_VERSIONS: 0x3b, Q_MODEL: 0x3c, Q_SERIAL: 0x61
 };
@@ -76,9 +79,34 @@ function sum8(bytes, upto) { let s = 0; const n = (upto === undefined ? bytes.le
 function shortFrame(reg, data) { data = data || []; const f = [0xFF, 0x55, reg & 0xff, data.length & 0xff].concat(data.map(b => b & 0xff)); f.push(sum8(f)); return f; }
 // Long 8-byte frame: FF 55 REG 00 00 00 VAL 00. Last byte fixed 0x00 (NOT a checksum).
 function longFrame(reg, val) { return [0xFF, 0x55, reg & 0xff, 0x00, 0x00, 0x00, (val || 0) & 0xff, 0x00]; }
+
+// Load-time protocol self-test (mirrors Active/inokim-unlock FRAME_OK): THIS page's real builders
+// must reproduce known-good command frames byte-for-byte, then every short frame must round-trip
+// through the additive-checksum rule. Vectors are code-proven from the decompiled app, never guessed:
+// the sccss/util/Command.java write table and the Constants.java astrictSpeed set.
+// parseHex of each proven hex string is the expected value.
+const parseHex = (s) => (String(s).match(/[0-9a-fA-F]{2}/g) || []).map(h => parseInt(h, 16));
+const FRAME_OK = (function () {
+  const eq = (a, b) => a.length === b.length && a.every((v, i) => (v & 0xff) === (b[i] & 0xff));
+  // Short frames FF 55 REG LEN DATA CHK, CHK = sum of all preceding bytes mod 256.
+  const SHORT = [
+    [shortFrame(REG.STATUS),             'FF55010055'],   // status poll (TwoWheelActivity.java:160,401)
+    [shortFrame(REG.HEARTBEAT),          'FF5508005C'],   // heartbeat (ViseBluetooth manager)
+    [shortFrame(REG.DRIVE_MODE, [0x01]), 'FF5510010166'], // drive mode electro (Command.java)
+    [shortFrame(REG.LOCK, [0x01]),       'FF551701016D'], // unlock (Command.java)
+    [shortFrame(REG.HEADLIGHT, [0x02]),  'FF552301027A'], // light on (Command.java)
+    [shortFrame(REG.SELFTEST, [0x00, 0x00]), 'FF551E02000074'],     // self-test (CheckActivity.java:180,222)
+    [shortFrame(REG.RGB, [0x12, 0x34, 0x56]), 'FF55150312345608']   // lamp colour (CarLampSettingsActivity.java:218)
+  ];
+  // Long frame FF 55 REG 00 00 00 VAL 00: astrictSpeed set to 3.0 km/h (0x1E) (Constants.java).
+  const built = eq(longFrame(REG.SPEED_CAP, 0x1E), parseHex('FF55380000001E00'))
+    && SHORT.every(([f, h]) => eq(f, parseHex(h)));
+  // Round-trip: the receive-side additive checksum (parseFrame) must re-derive each short frame's CHK.
+  const roundTrip = SHORT.every(([f]) => sum8(f, f.length - 1) === f[f.length - 1]);
+  return built && roundTrip;
+})();
 const numBE = (bytes) => { let v = 0; for (const x of bytes) v = v * 256 + x; return v; };
 const asciiOf = (b) => b.filter(x => x >= 32 && x < 127).map(x => String.fromCharCode(x)).join('');
-const parseHex = (s) => (String(s).match(/[0-9a-fA-F]{2}/g) || []).map(h => parseInt(h, 16));
 const valBytes = (v) => { v &= 0xffff; return v > 0xff ? [(v >> 8) & 0xff, v & 0xff] : [v & 0xff]; };
 
 // --------------------------- log (raw buffer + one anonymize gate; copy/save use the same text) ---------------------------
@@ -103,11 +131,12 @@ function anonymize(s) {
   return redact(s.replace(/\x01[^\x01]*\x01/g, 'XX').replace(/\x01/g, ''));
 }
 function logLine(cls, text) {
-  logBuffer.push({ raw: text, cls: cls || '' });
+  const line = '[' + new Date().toTimeString().slice(0, 8) + '] ' + text;
+  logBuffer.push({ raw: line, cls: cls || '' });
   const el = $('log'); if (!el) return;
   const span = document.createElement('span');
   if (cls) span.className = cls;
-  span.textContent = anonymize(text) + '\n';
+  span.textContent = anonymize(line) + '\n';
   el.appendChild(span); el.scrollTop = el.scrollHeight;
 }
 // Re-render the whole pane from the raw buffer (after the Public-Log toggle flips).
@@ -159,17 +188,17 @@ function resetTiles() {
   updateTilesEmpty();
 }
 // Control cards are hidden until connected, then all revealed (one protocol serves every model).
-function showControlCards(on) { ['card-speed','card-mode','card-more','card-immob','card-expert'].forEach(id => { const c = $(id); if (c) c.hidden = !on; }); }
+function showControlCards(on) { ['live-card','batt-card','more-card','raw-card'].forEach(id => { const c = $(id); if (c) c.hidden = !on; }); }
 function logDiagnosticHeader() {
   logLine('', '=== jo-unlock diagnostic ===');
-  logLine('', 'time: ' + new Date().toISOString());
   logLine('', 'build: ' + BUILD);
-  logLine('', 'userAgent: ' + navigator.userAgent);
+  logLine('', 'time: ' + new Date().toISOString());
+  logLine('', 'userAgent: ' + (navigator.userAgent || '?'));
   logLine('', 'platform: ' + (navigator.platform || '?'));
   logLine('', 'webBluetooth: ' + (navigator.bluetooth ? 'yes' : 'no'));
-  logLine('', '============================');
-  const c = cap();
-  logLine('', 'model: ' + (c ? c.label : 'auto detect') + ' [self-test: ' + (c ? c.selfTest : 'family unknown until picked') + ']');
+  logLine('', 'protocol self-test: ' + (FRAME_OK ? 'OK' : 'FAILED'));
+  if (!FRAME_OK) logErr('protocol self-test FAILED: builder did not reproduce a known-good vector');
+  logLine('', '================================');
 }
 
 // --------------------------- i18n ---------------------------
@@ -204,7 +233,7 @@ function initLangSwitch() {
 function applyTheme(dark) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const b = $('btn-theme');
-  if (b) { b.innerHTML = dark ? '&#9728;' : '&#9790;'; b.setAttribute('aria-label', t(dark ? 'themeToLight' : 'themeToDark')); b.title = b.getAttribute('aria-label'); } // scan-ok: fixed character (sun/moon), not user input
+  if (b) { b.textContent = dark ? '\u2600' : '\u263E'; b.setAttribute('aria-label', t(dark ? 'themeToLight' : 'themeToDark')); b.title = b.getAttribute('aria-label'); }
   try { localStorage.setItem(LS.THEME, dark ? 'dark' : 'light'); } catch (e) {}
 }
 function initTheme() {
@@ -245,7 +274,7 @@ function setStatus(s) {
 function setControlsEnabled(on) {
   ['btn-setspeed','speed-kmh','btn-mode','mode-in','btn-light','light-in','btn-cruise','cruise-in',
    'btn-startmode','startmode-in','btn-unit','unit-in','btn-gear','gear-in','btn-lamp','lamp-in',
-   'btn-voltage','voltage-in','btn-wheel','wheel-in','btn-selftest','btn-info',
+   'btn-rgb','rgb-in','btn-voltage','voltage-in','btn-wheel','wheel-in','btn-selftest','btn-info',
    'btn-immob-unlock','btn-immob-lock','btn-writereg','reg-nr','reg-val','btn-readreg','read-addr',
    'read-val','btn-raw','btn-raw-plain','raw-hex']
     .forEach(id => { const e = $(id); if (e) e.disabled = !on; });
@@ -459,7 +488,7 @@ function wireDocViewer() {
 }
 
 // --------------------------- help ---------------------------
-const HELP = { speed: ['s3Title', 'speedValuesHint'], mode: ['modeTitle', 'modeHint'], more: ['moreTitle', 'moreHint'], immob: ['immobTitle', 'immobHint'], expert: ['expertTitle', 'expertHint'], publiclog: ['publicLogTitle', 'publicLogHelpHtml'], diaglog: ['diagLogTitle', 'diagLogHelpHtml'], disclaimer: ['footDisclaimer', 'disclaimerText'] };
+const HELP = { live: ['liveTitle', 'liveHint'], batt: ['help_batt_t', 'help_batt_b'], speed: ['s3Title', 'speedValuesHint'], mode: ['modeTitle', 'modeHint'], more: ['moreTitle', 'moreHint'], immob: ['immobTitle', 'immobHint'], expert: ['expertTitle', 'expertHint'], publiclog: ['publicLogTitle', 'publicLogHelpHtml'], diaglog: ['diagLogTitle', 'diagLogHelpHtml'], disclaimer: ['footDisclaimer', 'disclaimerText'] };
 function openHelp(key) {
   const m = HELP[key]; if (!m) return; const dlg = $('help'); if (!dlg) return;
   $('help-title').textContent = t(m[0]);
@@ -497,10 +526,17 @@ window.addEventListener('DOMContentLoaded', () => {
   $('btn-unit').addEventListener('click', () => guard(() => writeReg(REG.UNIT, [parseInt($('unit-in').value, 10) & 0xff], 'unit ' + ($('unit-in').value === '1' ? 'km/h' : 'mph'))));
   $('btn-gear').addEventListener('click', () => guard(() => writeReg(REG.GEAR, [parseInt($('gear-in').value, 10) & 0xff], 'gear ' + $('gear-in').value)));
   $('btn-lamp').addEventListener('click', () => guard(() => writeReg(REG.LAMP, [parseInt($('lamp-in').value, 10) & 0xff], 'lamp mode ' + $('lamp-in').value)));
+  // RGB lamp colour (0x15, FF551503 RR GG BB): three data bytes from the colour picker, additive checksum.
+  $('btn-rgb').addEventListener('click', () => guard(() => {
+    const h = ($('rgb-in').value || '#000000').replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16) || 0, g = parseInt(h.slice(2, 4), 16) || 0, b = parseInt(h.slice(4, 6), 16) || 0;
+    return writeReg(REG.RGB, [r, g, b], 'lamp colour #' + h.toUpperCase());
+  }));
   $('btn-voltage').addEventListener('click', () => guard(() => writeReg(REG.VOLTAGE, [parseInt($('voltage-in').value, 10) & 0xff], 'voltage class ' + $('voltage-in').value)));
   $('btn-wheel').addEventListener('click', () => guard(() => writeReg(REG.WHEEL, [parseInt($('wheel-in').value, 10) & 0xff], 'wheel size index ' + $('wheel-in').value)));
   $('btn-selftest').addEventListener('click', () => guard(() => writeReg(REG.SELFTEST, [0x00, 0x00], 'self-test requested')));
-  $('btn-info').addEventListener('click', () => guard(async () => { await writeReg(REG.INFO, [0x01], 'vehicle-info query'); await query(REG.Q_SERIAL); await query(REG.Q_VERSIONS); await query(REG.Q_MODEL); }));
+  // Vehicle-info: re-request the proven identity strings (serial 0x61, versions 0x3B, model 0x3C).
+  $('btn-info').addEventListener('click', () => guard(async () => { logSys('vehicle-info query'); await query(REG.Q_SERIAL); await query(REG.Q_VERSIONS); await query(REG.Q_MODEL); }));
 
   $('btn-immob-unlock').addEventListener('click', () => guard(() => writeReg(REG.LOCK, [0x01], 'unlock')));
   $('btn-immob-lock').addEventListener('click', () => guard(() => writeReg(REG.LOCK, [0x02], 'lock')));
