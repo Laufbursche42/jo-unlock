@@ -105,10 +105,10 @@ window.I18N = {
     btnOn: "An",
     btnOff: "Aus",
 
-    immobTitle: "Diebstahlsperre",
-    immobHint: "Wegfahrsperre des Scooters (Diebstahlschutz). Hat nichts mit der Geschwindigkeit zu tun. Register 0x17: 01 entsperren, 02 sperren (einfache Form ohne PIN).",
-    btnImmobLock: "Sperren",
-    btnImmobUnlock: "Entsperren",
+    immobTitle: "Wegfahrsperre (Diebstahlschutz)",
+    immobHint: "Reine Wegfahrsperre (Diebstahlschutz) - hat NICHTS mit der Geschwindigkeits-Drossel zu tun. Register 0x17: 01 Wegfahrsperre aus, 02 Wegfahrsperre an (einfache Form ohne PIN).",
+    btnImmobLock: "Wegfahrsperre an",
+    btnImmobUnlock: "Wegfahrsperre aus",
 
     expertTitle: "Experten-Modus",
     expertHint: "Kurzes Frame FF 55 REG LEN DATA CHK zum Schreiben, 8-Byte-Query zum Abfragen. Register lesen: Serie 0x61, Versionen 0x3B, Modell 0x3C. Roh senden schickt die Bytes unverändert (für die prüfsummenlosen 8-Byte-Frames).",
@@ -150,7 +150,6 @@ window.I18N = {
 
     footGuide: "Anleitung",
     footDisclaimer: "Haftungsausschluss",
-    disclaimerText: "Dieses Werkzeug ist eine Machbarkeitsstudie, kein fertiges Produkt. Es gibt keine Gewährleistung und keine Garantie für fehlerfreien Betrieb. Das Ändern von Einstellungen über Bluetooth kann ein Fahrzeug außerhalb des Zustands bringen, in dem es genehmigt wurde. Nutzung ausschließlich am eigenen Fahrzeug und auf eigenes Risiko. Die Seite spricht nur lokal per Bluetooth mit dem Gerät, es werden keine Daten an einen Server gesendet. Joyor und Lenzod sind Marken der jeweiligen Inhaber. Dieses Projekt ist unabhängig und nicht mit Joyor oder Lenzod verbunden.",
     footSource: "Quellcode",
     footIssue: "Fehler melden",
     footReadme: "Readme",
@@ -273,10 +272,10 @@ window.I18N = {
     btnOn: "On",
     btnOff: "Off",
 
-    immobTitle: "Immobilizer",
-    immobHint: "The scooter immobilizer (anti-theft). Nothing to do with speed. Register 0x17: 01 unlock, 02 lock (simple form without a PIN).",
-    btnImmobLock: "Lock",
-    btnImmobUnlock: "Unlock",
+    immobTitle: "Immobilizer (anti-theft only)",
+    immobHint: "Pure anti-theft immobilizer - NOTHING to do with the speed limiter. Register 0x17: 01 immob off, 02 immob on (simple form without a PIN).",
+    btnImmobLock: "Immob on",
+    btnImmobUnlock: "Immob off",
 
     expertTitle: "Expert mode",
     expertHint: "Short frame FF 55 REG LEN DATA CHK to write, 8-byte query to read. Read registers: serial 0x61, versions 0x3B, model 0x3C. Send raw sends the bytes unchanged (for the checksum-less 8-byte frames).",
@@ -318,7 +317,6 @@ window.I18N = {
 
     footGuide: "Guide",
     footDisclaimer: "Disclaimer",
-    disclaimerText: "This tool is a feasibility study, not a finished product. There is no warranty and no guarantee of error-free operation. Changing settings over Bluetooth can leave a vehicle outside the condition it was approved in. Use it only on your own vehicle and at your own risk. The page talks to the device locally over Bluetooth only, no data is sent to any server. Joyor and Lenzod are trademarks of their respective owners. This project is independent and not affiliated with Joyor or Lenzod.",
     footSource: "Source",
     footIssue: "Report an issue",
     footReadme: "Readme",

@@ -460,6 +460,7 @@ const DOC_TITLES = {
   'GUIDE.de.md': 'footGuide', 'GUIDE.en.md': 'footGuide',
   'PRIVACY.de.md': 'footPrivacy', 'PRIVACY.md': 'footPrivacy',
   'LICENSE.de.md': 'footLicense', 'LICENSE.md': 'footLicense',
+  'DISCLAIMER.de.md': 'footDisclaimer', 'DISCLAIMER.md': 'footDisclaimer',
   'TRADEMARKS.de.md': 'footTrademarks', 'TRADEMARKS.md': 'footTrademarks',
   'README.md': 'footReadme'
 };
@@ -519,7 +520,7 @@ function openDocFile(file, titleKey) {
 function wireDocViewer() {
   document.addEventListener('click', e => {
     if (!e.target.closest) return;
-    const disc = e.target.closest('[data-open-disclaimer]'); if (disc) { e.preventDefault(); openHelp('disclaimer'); return; }
+    const disc = e.target.closest('[data-open-disclaimer]'); if (disc) { e.preventDefault(); openDocFile(docFile('DISCLAIMER'), 'footDisclaimer'); return; }
     const a = e.target.closest('[data-doc], [data-docfile]'); if (!a) return;
     e.preventDefault();
     const file = a.getAttribute('data-docfile');
@@ -530,7 +531,7 @@ function wireDocViewer() {
 }
 
 // --------------------------- help ---------------------------
-const HELP = { live: ['liveTitle', 'liveHint'], batt: ['help_batt_t', 'help_batt_b'], speed: ['s3Title', 'speedValuesHint'], mode: ['modeTitle', 'modeHint'], more: ['moreTitle', 'moreHint'], immob: ['immobTitle', 'immobHint'], expert: ['expertTitle', 'expertHint'], publiclog: ['publicLogTitle', 'publicLogHelpHtml'], diaglog: ['diagLogTitle', 'diagLogHelpHtml'], disclaimer: ['footDisclaimer', 'disclaimerText'] };
+const HELP = { live: ['liveTitle', 'liveHint'], batt: ['help_batt_t', 'help_batt_b'], speed: ['s3Title', 'speedValuesHint'], mode: ['modeTitle', 'modeHint'], more: ['moreTitle', 'moreHint'], immob: ['immobTitle', 'immobHint'], expert: ['expertTitle', 'expertHint'], publiclog: ['publicLogTitle', 'publicLogHelpHtml'], diaglog: ['diagLogTitle', 'diagLogHelpHtml'] };
 function openHelp(key) {
   const m = HELP[key]; if (!m) return; const dlg = $('help'); if (!dlg) return;
   $('help-title').textContent = t(m[0]);
@@ -597,7 +598,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.help-btn').forEach(btn => btn.addEventListener('click', () => openHelp(btn.getAttribute('data-help'))));
   ['help-x', 'help-close'].forEach(id => { const b = $(id); if (b) b.addEventListener('click', closeHelp); });
-  { const b = $('link-disclaimer'); if (b) b.addEventListener('click', e => { e.preventDefault(); openHelp('disclaimer'); }); }
+  { const b = $('link-disclaimer'); if (b) b.addEventListener('click', e => { e.preventDefault(); openDocFile(docFile('DISCLAIMER'), 'footDisclaimer'); }); }
 
   $('btn-copy-log').addEventListener('click', copyLog);
   $('btn-clear-log').addEventListener('click', clearLog);
