@@ -608,9 +608,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (cb) {
       let saved = '1'; try { saved = localStorage.getItem(LS.PUBLICLOG) || '1'; } catch (e) {}
       publicLog = saved !== '0'; cb.checked = publicLog;
-      cb.addEventListener('change', () => { publicLog = cb.checked; try { localStorage.setItem(LS.PUBLICLOG, cb.checked ? '1' : '0'); } catch (e) {} renderLog(); });
+      cb.addEventListener('change', () => { publicLog = cb.checked; try { localStorage.setItem(LS.PUBLICLOG, cb.checked ? '1' : '0'); } catch (e) {} logSys('public-log: ' + (cb.checked ? 'on (anonymizing device name/id)' : 'off')); renderLog(); });
     } }
   // Diagnostics: default OFF each session (not persisted); taps every raw notify chunk.
   { const cb = $('diag-log');
-    if (cb) { diag = false; cb.checked = false; cb.addEventListener('change', () => { setDiag(cb.checked); logLine('log-rx', diag ? t('diagOn') : t('diagOff')); }); } }
+    if (cb) { diag = false; cb.checked = false; cb.addEventListener('change', () => { setDiag(cb.checked); logSys('diag-log: ' + (cb.checked ? 'on' : 'off')); logLine('log-rx', diag ? t('diagOn') : t('diagOff')); }); } }
+  // Show-all-devices toggle: no scan-side effect here (requestDevice already uses acceptAllDevices), just log the flip.
+  { const sa = $('showall'); if (sa) sa.addEventListener('change', () => { logSys('show-all-devices: ' + (sa.checked ? 'on' : 'off')); }); }
 });
