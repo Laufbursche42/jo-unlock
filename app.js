@@ -43,6 +43,10 @@ const REG = {
   // RGB 0x15 = lamp colour (CarLampSettingsActivity.java:218, FF551503 RR GG BB); LAMP 0x19 = lamp mode
   // (CarLampSettingsActivity.java:104-113, 01 single colour / 02 RGB). JOYSTICK 0x16 is the proven
   // remote-control register (BluetoothControlActivity.java:169,339) - not exposed, it drives the scooter.
+  // GOVERNOR 0x2A = sister-app Lenzod Pro drive/brake/accel/max-speed governor
+  // (CarSpeedActivity.java:89-95, CommandUtil.java:49-59). Bounded %, UNTESTED on controller.
+  // Joyor app itself never sends 0x2A - only Lenzod Pro, and only for controllers reporting mHardVersion.
+  GOVERNOR: 0x2a,
   // 8-byte long-frame queries / set (no checksum, last byte 0x00):
   SPEED_CAP: 0x38, Q_VERSIONS: 0x3b, Q_MODEL: 0x3c, Q_SERIAL: 0x61
 };
@@ -60,6 +64,13 @@ const HEARTBEAT_MS = 5000; // keep-alive cadence
 const MODELS = {
   NIUNIU: { label: 'NIUNIU', selfTest: 'body/brake/Hall/hardware/battery' },
   HUABAN: { label: 'HUABAN', selfTest: 'hardware/Hall/communication/battery/board' }
+};
+// Family-identifier serial frames hardcoded in the original Joyor app's Constant.java:5-6.
+// First serial-reply (0x02) after connect matches exactly one of these, which classifies the family.
+// Device-side classification mirrors com.yunshang.speed.joyor DeviceDiscoverActivityNew:107-128.
+const CAR_TYPE_HEX = {
+  NIUNIU: 'FF5502083935323730313233FB',
+  HUABAN: 'FF55020839353237373839300D'
 };
 
 // --------------------------- helpers ---------------------------
@@ -96,7 +107,10 @@ const FRAME_OK = (function () {
     [shortFrame(REG.LOCK, [0x01]),       'FF551701016D'], // unlock (Command.java)
     [shortFrame(REG.HEADLIGHT, [0x02]),  'FF552301027A'], // light on (Command.java)
     [shortFrame(REG.SELFTEST, [0x00, 0x00]), 'FF551E02000074'],     // self-test (CheckActivity.java:180,222)
-    [shortFrame(REG.RGB, [0x12, 0x34, 0x56]), 'FF55150312345608']   // lamp colour (CarLampSettingsActivity.java:218)
+    [shortFrame(REG.RGB, [0x12, 0x34, 0x56]), 'FF55150312345608'],  // lamp colour (CarLampSettingsActivity.java:218)
+    // Governor frame FF 55 2A 06 <drive> <brake> <accel> <maxspeed> 00 00 CHK.
+    // maxspeed byte = governor% + 128 (0x80 base). Test vector: drive=05 brake=05 accel=05, 100% maxspeed (0xE4).
+    [shortFrame(REG.GOVERNOR, [0x05, 0x05, 0x05, 0xe4, 0x00, 0x00]), 'FF552A06050505E4000077']
   ];
   // Long frame FF 55 REG 00 00 00 VAL 00: astrictSpeed set to 3.0 km/h (0x1E) (Constants.java).
   const built = eq(longFrame(REG.SPEED_CAP, 0x1E), parseHex('FF55380000001E00'))
@@ -276,7 +290,7 @@ function setControlsEnabled(on) {
    'btn-startmode','startmode-in','btn-unit','unit-in','btn-gear','gear-in','btn-lamp','lamp-in',
    'btn-rgb','rgb-in','btn-voltage','voltage-in','btn-wheel','wheel-in','btn-selftest','btn-info',
    'btn-immob-unlock','btn-immob-lock','btn-writereg','reg-nr','reg-val','btn-readreg','read-addr',
-   'read-val','btn-raw','btn-raw-plain','raw-hex']
+   'read-val','btn-raw','btn-raw-plain','raw-hex','btn-governor','gov-drive','gov-brake','gov-accel','gov-max']
     .forEach(id => { const e = $(id); if (e) e.disabled = !on; });
 }
 
@@ -348,8 +362,24 @@ function onNotify(bytes) {
 function parseFrame(f) {
   const reg = f[2], payload = f.slice(4, f.length - 1), chk = f[f.length - 1];
   logRx(f, sum8(f, f.length - 1) === chk ? '' : ' [chk?]');
+  autoDetectModel(f);
   decode(reg, payload);
   refreshTele();
+}
+// Auto-detect the NIUNIU/HUABAN family from the first matching serial reply (same string match as the
+// original Joyor app's DeviceDiscoverActivityNew:107-128). Only runs while model is still 'auto'; a
+// manual dropdown pick wins and is never overridden.
+function autoDetectModel(f) {
+  if (model !== 'auto') return;
+  if (f[2] !== TELE.serial) return;
+  const h = f.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+  for (const key of Object.keys(CAR_TYPE_HEX)) {
+    if (CAR_TYPE_HEX[key] === h) {
+      setModel(key, true);
+      logSys('family auto-detected: ' + key + ' (serial match on ' + h + ')');
+      return;
+    }
+  }
 }
 function decode(reg, payload) {
   switch (reg) {
@@ -394,6 +424,18 @@ async function setSpeedCap(kmh) {
   await writeFrame(longFrame(REG.SPEED_CAP, val));
   logSys('walk-assist cap ' + kmh + ' km/h (0x38 VAL 0x' + val.toString(16).padStart(2, '0').toUpperCase() + ')');
   if (kmh > 18) logSys('note: the app resets this above 18 km/h; 0x38 caps DOWN only, it never raises the top speed');
+}
+// Governor command 0x2A - EXPERIMENTAL. Sister-app Lenzod Pro only; Joyor app never sends this.
+// Frame FF 55 2A 06 <drive> <brake> <accel> <maxspeed> 00 00 CHK. maxspeed = percent + 128 (0x80 base).
+// Controller acceptance is UNKNOWN - documented as untested in the research. Only controllers
+// reporting mHardVersion were originally targeted by Lenzod Pro.
+async function setGovernor(drivePct, brakePct, accelPct, maxPct) {
+  const clamp = (v) => Math.max(0, Math.min(127, Math.round(v)));
+  const d = clamp(drivePct), b = clamp(brakePct), a = clamp(accelPct), m = clamp(maxPct);
+  const frame = shortFrame(REG.GOVERNOR, [d, b, a, 0x80 + m, 0x00, 0x00]);
+  await writeFrame(frame);
+  logSys('governor 0x2A sent: drive=' + d + '% brake=' + b + '% accel=' + a + '% maxspeed=' + m + '% (byte 0x' + (0x80 + m).toString(16).padStart(2, '0').toUpperCase() + ')');
+  logSys('note: 0x2A is UNTESTED on the controller - only Lenzod Pro sends it, and only for controllers reporting mHardVersion');
 }
 
 // --------------------------- GATT primitives ---------------------------
@@ -545,6 +587,13 @@ window.addEventListener('DOMContentLoaded', () => {
   $('btn-readreg').addEventListener('click', () => guard(() => query(parseInt($('read-addr').value, 10) & 0xff, parseInt($('read-val').value, 10) & 0xff)));
   $('btn-raw').addEventListener('click', () => guard(() => { const b = parseHex($('raw-hex').value); if (b.length < 3) { logErr('too short'); return Promise.resolve(); } b.push(sum8(b)); return writeFrame(b); }));
   $('btn-raw-plain').addEventListener('click', () => guard(() => { const b = parseHex($('raw-hex').value); if (!b.length) { logErr('no bytes'); return Promise.resolve(); } return writeFrame(b); }));
+  $('btn-governor').addEventListener('click', () => guard(() => {
+    const d = parseInt($('gov-drive').value, 10) || 0;
+    const b = parseInt($('gov-brake').value, 10) || 0;
+    const a = parseInt($('gov-accel').value, 10) || 0;
+    const m = parseInt($('gov-max').value, 10) || 0;
+    return setGovernor(d, b, a, m);
+  }));
 
   document.querySelectorAll('.help-btn').forEach(btn => btn.addEventListener('click', () => openHelp(btn.getAttribute('data-help'))));
   ['help-x', 'help-close'].forEach(id => { const b = $(id); if (b) b.addEventListener('click', closeHelp); });
