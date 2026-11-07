@@ -10,7 +10,7 @@
  */
 
 // The pre-commit cache-buster auto-bumps BUILD and every ?v= in index.html on any web-asset change.
-const BUILD = 'v1';
+const BUILD = 'v2';
 
 // --------------------------- UUIDs (Web Bluetooth wants lowercase) ---------------------------
 // Write 0x8877 (app -> device), notify 0x8888 (device -> app). The app never records a service UUID,
